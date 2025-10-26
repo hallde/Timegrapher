@@ -5,7 +5,7 @@ from scipy.signal import butter, lfilter, find_peaks, filtfilt
 
 #Normal settings
 duration = 20
-hz = 0
+hz = 18000
 
 
 fs = 128000
@@ -50,6 +50,7 @@ def beat_rate_auto_detect():
     envelope = envelope / (np.max(envelope) + epsilon)
     db_envelope = 20 * np.log10(envelope + epsilon)
     for beat_rate in common_beats:
+
         min_tick_spacing=(3600/beat_rate)/2
 
         peaks, _ = find_peaks(db_envelope, height=peak_db_threshold, distance=min_tick_spacing * fs)
@@ -58,20 +59,23 @@ def beat_rate_auto_detect():
         std_interval = np.std(intervals)
         mean_interval = np.mean(intervals)
         bps_target = 1/(beat_rate / 3600)
-        print(f"Actual: {mean_interval} | Comparison: {bps_target} | High end: {mean_interval+std_interval} | Low End: {mean_interval-std_interval}")
+        top_end = (std_interval * std_interval) + mean_interval
+        bottom_end = mean_interval - (std_interval * std_interval)
+        print(f"Min tick spacing: {min_tick_spacing:.4f} for {beat_rate} \t| Comparison: {bps_target:.4f} \t| High end: {top_end:.4f} \t| Actual: {mean_interval:.4f} \t| Low End: {bottom_end:.4f}")
 
-        if mean_interval-(std_interval*0.5) <= bps_target <= (std_interval*0.5)+mean_interval:
+        if bottom_end <= bps_target <= top_end:
             print("Flagged")
             return beat_rate
-    print("Flag missed - defaulting to 3600")
-    return 3600
+
+    print("Flag missed - trying again")
+    beat_rate_auto_detect()
+
 
 if hz == 0:
     hz=(beat_rate_auto_detect())
     print(f"Beat rate set to {hz}bph")
-    min_tick_spacing = (3600/hz)/2
+min_tick_spacing = (3600/hz)/2
 
-analyze_beat_error([1,2,2,3,3,1,43,3,3,3,3,3,3,3,3,1])
 print("Recording...")
 audio = sd.rec(int(duration*fs), samplerate=fs, channels=1)
 sd.wait()
